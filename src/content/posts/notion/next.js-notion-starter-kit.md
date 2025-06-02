@@ -1,0 +1,15 @@
+---
+title: Next.js Notion Starter Kit
+published: 2021-01-20
+updated: 2025-06-02
+description: Deploy your own Notion-powered website in minutes with Next.js and Vercel.
+image: "https://prod-files-secure.s3.us-west-2.amazonaws.com/f467702f-9f5e-4653-bed9-5e0f3d612bbf/0cb69622-caba-4237-9639-98cdbd6e58af/bg-gradient-opt.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Content-Sha256=UNSIGNED-PAYLOAD&X-Amz-Credential=ASIAZI2LB4666QLXULFH%2F20250602%2Fus-west-2%2Fs3%2Faws4_request&X-Amz-Date=20250602T125520Z&X-Amz-Expires=3600&X-Amz-Security-Token=IQoJb3JpZ2luX2VjECUaCXVzLXdlc3QtMiJIMEYCIQCON1XfL5Svb7PI296m28MPLUKwUL0n3sjJLvBtCuH%2FVwIhALvI%2Byw9x%2FFAJ5Q1%2BsbrZOOM73mBRUva19psiUA485YLKogECO7%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQABoMNjM3NDIzMTgzODA1IgxX5tVuVUl2ErHtdo0q3APeksNPWmFYULSF72daw11vqQnv4netYC0sQEIL6%2FcHNcszZaYLZwKDZ9MORfyvL1OyNyfGDpMKT9%2FEb0hE%2B2u2dgsuydI9awSIhzTDBkiNJeFPy3mCnQtGAhrTIwv5Xy%2B9xgr1AqXoiDEUVHh4ieBTh5PFezRWCeesOP8E2vlAtyXqDshtrVfB5NVapTGli%2FsufW2UZm%2BKFyUZ%2BatLj4Ha9b8XDu93QoBo8iTxEQE17FBljmODzga8AloXbi%2FGoUcOnURVfOzsekq2yQkd4gb5hjDsrcVE4wL12EHaaK%2FGf6kESktjt7H7%2Fwi9vAeFJRx5SEL9OKgIdKB52o%2Bp3wLKSP74xAfJsXyKxqLwa0OqmCAdH9zjxKkW5hevapJJDoEZp3Z5XiOKq9Noli%2FJRCy7l4FMe5OjCKoVhOt8e4rntGZIsne6RgcC0O%2BQjHuVmaEAZY77t1wnZyEhUkcnOOOjgXjcd%2BiEiCXF5ziEyENBj%2BlMppIIbrR8%2FAVPJsp4qrhpoF%2FjXIIqRSGQlRaYBCw7BG2fe11H78Dwv2XSLOscMzQqwqpdZiavYW43NH9M7pz6a%2FktPFkUagJECq3z5YjKczcaSV8c%2BMdKCy5jHhufGoJnvkD6WRYdbrooCDD5tPbBBjqkAYH%2BxQ1p4qKNhxW8SFJhiYragfi9kpIfWMlh0vSbUHNknh9AdreSnzc8PZMKA8IaaZRK5kH3y6pUnfWwkZwsa0R%2FT7GfoXFwDBTBgl7%2BsumMT7yitx97ipr7R5OtV%2BHOLxgfjLm0eu7MIor27%2F1LqrKGuPfIcdeE6dR3MjsY4bTIoX2O95sSaDv6%2BTw2eyVJxBKf2pTESFfBIo8UMkUmjW9XgncW&X-Amz-Signature=ec5935dbbda54c0c2a66fcbe4b6bf1c2bfb96f05d223fba7efed7fcc0b75f90f&X-Amz-SignedHeaders=host&x-id=GetObject"
+tags: [Web Dev, OSS, Node.js, React.js, Projects]
+category: Personal
+draft: false
+lang: ''
+---
+
+
+Read the full guide here
+
