@@ -1,0 +1,84 @@
+.code-more-box {
+    width: 100%;
+    padding-top: 0;
+    /* 增强渐变效果，使渐变更加明显 */
+    background-image: -webkit-gradient(linear, left top, left bottom, 
+        from(transparent), 
+        color-stop(50%, rgba(255, 255, 255, 0.1)), 
+        to(rgba(255, 255, 255, 0.2)));
+    background-image: linear-gradient(to bottom, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.1) 50%, 
+        rgba(255, 255, 255, 0.2) 100%);
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 120px; /* 设置固定高度，增加透明区域 */
+    z-index: 10; /* 确保在代码块上方 */
+}
+
+.dark .code-more-box {
+    /* 暗黑模式增强渐变效果，使用微弱的蓝色调增强可见性 */
+    background-image: -webkit-gradient(linear, left top, left bottom, 
+        from(rgba(0, 0, 0, 0)), 
+        color-stop(50%, rgba(70, 90, 120, 0.15)), 
+        to(rgba(70, 90, 120, 0.3)));
+    background-image: linear-gradient(to bottom, 
+        rgba(0, 0, 0, 0) 0%, 
+        rgba(70, 90, 120, 0.15) 50%, 
+        rgba(70, 90, 120, 0.3) 100%);
+}
+
+.code-more-btn {
+    width: 22px;
+    height: 16px;
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 11; /* 确保在渐变遮罩上方 */
+    cursor: pointer;
+    background: none;
+    border: none;
+    padding: 0;
+}
+
+.code-more-icon,
+.code-less-icon {
+    width: 22px;
+    height: 16px;
+    display: block;
+    transition: transform 0.2s ease;
+}
+
+.code-more-btn:hover .code-more-icon,
+.code-less-btn:hover .code-less-icon {
+    transform: scale(1.2);
+}
+
+/* 收起按钮样式 */
+.code-less-btn {
+    display: none; /* 默认隐藏 */
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 22px;
+    height: 16px;
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    z-index: 11;
+}
+
+/* 代码块处理相关样式 */
+.code-block {
+    position: relative;
+}
+
+/* 确保代码块中的滚动条样式在展开后仍然可见 */
+.code-block pre {
+    transition: max-height 0.3s ease-out;
+}

@@ -1,0 +1,182 @@
+---
+import type { MarkdownHeading } from "astro";
+import Categories from "./Categories.astro";
+import Profile from "./Profile.astro";
+import Tag from "./Tags.astro";
+import TOC from "./TOC.astro";
+import { siteConfig } from "../../config";
+
+interface Props {
+	class?: string;
+	headings?: MarkdownHeading[];
+}
+
+const className = Astro.props.class;
+const headings = Astro.props.headings || [];
+// 检查当前是否为About页面（首页）
+const isAboutPage = Astro.url.pathname === "/";
+---
+
+<div id="sidebar" class:list={[className, "w-full"]}>
+    <div class="flex flex-col w-full gap-4 mb-4">
+        {/* 添加id以便JavaScript控制 */}
+        {isAboutPage ? (
+            <div id="profile-container" class="hidden lg:block">
+                <Profile></Profile>
+            </div>
+        ) : (
+            <div id="profile-container">
+                <Profile></Profile>
+            </div>
+        )}
+    </div>
+    <div id="sidebar-sticky" class="transition-all duration-700 flex flex-col w-full gap-4 top-4 sticky top-4">
+        {siteConfig.toc.enable && 
+        <div id="toc-wrapper" class:list={["w-full onload-animation", {'no-display': headings.length === 0}]} style="animation-delay: 150ms">
+            <div id="toc-inner-wrapper" class="w-full overflow-y-auto overflow-x-hidden hide-scrollbar overscroll-contain" style="max-height: calc(6 * 2rem + 5 * 0.5rem + 2rem)">
+                <div id="toc" class="w-full h-full transition-swup-fade">
+                    <TOC headings={headings}></TOC>
+                </div>
+            </div>
+        </div>
+        }
+        <Categories class="onload-animation" style="animation-delay: 200ms"></Categories>
+        <Tag class="onload-animation" style="animation-delay: 250ms"></Tag>
+    </div>
+</div>
+
+<style is:global>
+    #toc-wrapper.no-display {
+        display: none !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+        position: absolute !important;
+        transform: scale(0) !important;
+    }
+    
+    /* 防止目录滚动传播到外部 */
+    #toc-inner-wrapper {
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+</style>
+
+<script>
+    // Profile组件显示控制
+    function updateProfileVisibility() {
+        // 修正判断逻辑，只有真正的首页才算About页面
+        // 确保只匹配根路径，避免误判其他页面
+        const path = window.location.pathname;
+        const isAboutPage = path === "/" || path === "" || path === "/index.html";
+        
+        const profileContainer = document.getElementById('profile-container');
+        
+        if (profileContainer) {
+            // 清除之前的类
+            profileContainer.classList.remove('hidden', 'lg:block', 'block');
+            
+            // 重新设置正确的类
+            if (isAboutPage) {
+                // About页面：移动端隐藏，桌面端显示
+                profileContainer.classList.add('hidden', 'lg:block');
+            } else {
+                // 其他页面：始终显示
+                profileContainer.classList.add('block');
+            }
+        }
+    }
+
+    // 初始化检查
+    document.addEventListener('DOMContentLoaded', updateProfileVisibility);
+    
+    // 监听Swup页面切换
+    if (window.swup) {
+        window.swup.hooks.on('content:replace', updateProfileVisibility);
+    } else {
+        document.addEventListener('swup:enable', () => {
+            window.swup.hooks.on('content:replace', updateProfileVisibility);
+        });
+    }
+    
+    // 添加历史状态变化监听，捕获浏览器前进/后退按钮事件
+    window.addEventListener('popstate', updateProfileVisibility);
+
+    function checkTOC() {
+        const tocWrapper = document.getElementById('toc-wrapper');
+        if (!tocWrapper) return;
+        
+        const tocEl = document.querySelector('#toc table-of-contents');
+        if (!tocEl) {
+            tocWrapper.classList.add('no-display');
+            return;
+        }
+        
+        const headings = tocEl.querySelectorAll('a[href^="#"]');
+        if (headings.length === 0) {
+            tocWrapper.classList.add('no-display');
+        } else {
+            tocWrapper.classList.remove('no-display');
+        }
+    }
+
+    // 初始化检查
+    checkTOC();
+    
+    // 监听DOM变化
+    const observer = new MutationObserver(() => {
+        checkTOC();
+    });
+    
+    observer.observe(document.documentElement, { 
+        childList: true,
+        subtree: true
+    });
+    
+    // 监听Swup页面切换
+    if (window.swup) {
+        window.swup.hooks.on('content:replace', checkTOC);
+    } else {
+        document.addEventListener('swup:enable', () => {
+            window.swup.hooks.on('content:replace', checkTOC);
+        });
+    }
+    
+    // 阻止滚动事件传播
+    document.addEventListener('DOMContentLoaded', () => {
+        const tocInnerWrapper = document.getElementById('toc-inner-wrapper');
+        if (tocInnerWrapper) {
+            tocInnerWrapper.addEventListener('wheel', (e) => {
+                if (
+                    (tocInnerWrapper.scrollTop === 0 && e.deltaY < 0) ||
+                    (tocInnerWrapper.scrollHeight - tocInnerWrapper.scrollTop === tocInnerWrapper.clientHeight && e.deltaY > 0)
+                ) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+            
+            // 触摸事件处理
+            let touchStartY = 0;
+            tocInnerWrapper.addEventListener('touchstart', (e) => {
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+            
+            tocInnerWrapper.addEventListener('touchmove', (e) => {
+                const touchY = e.touches[0].clientY;
+                const touchDeltaY = touchY - touchStartY;
+                
+                if (
+                    (tocInnerWrapper.scrollTop === 0 && touchDeltaY > 0) ||
+                    (tocInnerWrapper.scrollHeight - tocInnerWrapper.scrollTop === tocInnerWrapper.clientHeight && touchDeltaY < 0)
+                ) {
+                    e.preventDefault();
+                }
+                
+                touchStartY = touchY;
+            }, { passive: false });
+        }
+    });
+</script>

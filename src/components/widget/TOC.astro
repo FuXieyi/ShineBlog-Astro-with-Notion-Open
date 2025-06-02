@@ -1,0 +1,310 @@
+---
+import type { MarkdownHeading } from "astro";
+import { siteConfig } from "../../config";
+
+interface Props {
+	class?: string;
+	headings: MarkdownHeading[];
+}
+
+let { headings = [] } = Astro.props;
+
+let minDepth = 10;
+for (const heading of headings) {
+	minDepth = Math.min(minDepth, heading.depth);
+}
+
+const className = Astro.props.class;
+
+const isPostsRoute = Astro.url.pathname.startsWith("/posts/");
+const isAboutPage = Astro.url.pathname === "/";
+
+const removeTailingHash = (text: string) => {
+	let lastIndexOfHash = text.lastIndexOf("#");
+	if (lastIndexOfHash !== text.length - 1) {
+		return text;
+	}
+	return text.substring(0, lastIndexOfHash);
+};
+
+const maxLevel = siteConfig.toc.depth;
+
+// 在about页面只显示最高级别的目录项
+const filteredHeadings = isAboutPage 
+    ? headings.filter((heading) => heading.depth === minDepth)
+    : headings.filter((heading) => heading.depth < minDepth + maxLevel);
+---
+<table-of-contents class:list={[className, "group"]}>
+    {filteredHeadings.map((heading) =>
+        <a 
+            href={`#${heading.slug}`} 
+            class="px-2 flex gap-2 relative transition w-full min-h-9 rounded-xl hover:bg-[var(--toc-btn-hover)] active:bg-[var(--toc-btn-active)] py-2"
+        >
+            <div 
+                class:list={[
+                    "transition w-5 h-5 shrink-0 rounded-lg text-xs flex items-center justify-center font-bold",
+                    {
+                        "bg-[var(--toc-badge-bg)] text-[var(--btn-content)]": heading.depth === minDepth,
+                        "ml-4": heading.depth === minDepth + 1,
+                        "ml-8": heading.depth === minDepth + 2,
+                    }
+                ]}
+            >
+                <div 
+                    class:list={[
+                        "transition rounded-[0.1875rem]",
+                        {
+                            "w-2 h-2 bg-[var(--toc-badge-bg)]": heading.depth <= minDepth + 1,
+                            "w-1.5 h-1.5 bg-black/5 dark:bg-white/10": heading.depth === minDepth + 2
+                        }
+                    ]}
+                ></div>
+            </div>
+            <div 
+                class:list={[
+                    "transition text-sm", 
+                    {
+                        "text-50": heading.depth <= minDepth + 1,
+                        "text-30": heading.depth === minDepth + 2,
+                    }
+                ]}
+            >
+                {removeTailingHash(heading.text)}
+            </div>
+        </a>
+    )}
+    <div 
+        id="active-indicator" 
+        class:list={[
+            "-z-10 absolute bg-[var(--toc-btn-hover)] left-0 right-0 rounded-xl transition-all",
+            "group-hover:bg-transparent border-2 border-[var(--toc-btn-hover)]",
+            "group-hover:border-[var(--toc-btn-active)] border-dashed lg:block hidden"
+        ]}
+    ></div>
+</table-of-contents>
+
+<script>
+class TableOfContents extends HTMLElement {
+    private tocEl: HTMLElement | null = null;
+    private readonly visibleClass = "visible";
+    private observer: IntersectionObserver;
+    private anchorNavTarget: HTMLElement | null = null;
+    private headingIdxMap = new Map<string, number>();
+    private headings: HTMLElement[] = [];
+    private sections: HTMLElement[] = [];
+    private tocEntries: HTMLAnchorElement[] = [];
+    private active: boolean[] = [];
+    private activeIndicator: HTMLElement | null = null;
+
+    constructor() {
+        super();
+        this.observer = new IntersectionObserver(
+            this.markVisibleSection,
+            { threshold: 0 }
+        );
+    }
+
+    private markVisibleSection = (entries: IntersectionObserverEntry[]) => {
+        entries.forEach((entry) => {
+            const id = entry.target.children[0]?.getAttribute("id");
+            const idx = id ? this.headingIdxMap.get(id) : undefined;
+            if (idx !== undefined) {
+                this.active[idx] = entry.isIntersecting;
+            }
+
+            if (entry.isIntersecting && this.anchorNavTarget === entry.target.firstChild) {
+                this.anchorNavTarget = null;
+            }
+        });
+
+        if (!this.active.includes(true)) {
+            this.fallback();
+        }
+        this.update();
+    };
+
+    private toggleActiveHeading = () => {
+        requestAnimationFrame(() => {
+            let i = this.active.length - 1;
+            let min = this.active.length - 1, max = 0;
+            
+            // Remove visible class from inactive headings
+            while (i >= 0 && !this.active[i]) {
+                this.tocEntries[i].classList.remove(this.visibleClass);
+                i--;
+            }
+            
+            // Add visible class to active headings
+            while (i >= 0 && this.active[i]) {
+                this.tocEntries[i].classList.add(this.visibleClass);
+                min = Math.min(min, i);
+                max = Math.max(max, i);
+                i--;
+            }
+            
+            // Remove visible class from remaining inactive headings
+            while (i >= 0) {
+                this.tocEntries[i].classList.remove(this.visibleClass);
+                i--;
+            }
+
+            // Update active indicator position
+            const parentOffset = this.tocEl?.getBoundingClientRect().top || 0;
+            const scrollOffset = this.tocEl?.scrollTop || 0;
+            const top = this.tocEntries[min].getBoundingClientRect().top - parentOffset + scrollOffset;
+            const bottom = this.tocEntries[max].getBoundingClientRect().bottom - parentOffset + scrollOffset;
+            
+            this.activeIndicator?.setAttribute("style", `top: ${top}px; height: ${bottom - top}px`);
+        });
+    };
+
+    private scrollToActiveHeading = () => {
+        if (this.anchorNavTarget || !this.tocEl) return;
+
+        const activeHeading = document.querySelectorAll<HTMLDivElement>(`#toc .${this.visibleClass}`);
+        if (!activeHeading.length) return;
+
+        const topmost = activeHeading[0];
+        const bottommost = activeHeading[activeHeading.length - 1];
+        const tocHeight = this.tocEl.clientHeight;
+
+        // Calculate scroll position
+        const top = bottommost.getBoundingClientRect().bottom -
+            topmost.getBoundingClientRect().top < 0.9 * tocHeight
+            ? topmost.offsetTop - 32
+            : bottommost.offsetTop - tocHeight * 0.8;
+
+        this.tocEl.scrollTo({
+            top,
+            left: 0,
+            behavior: "smooth",
+        });
+    };
+
+    private update = () => {
+        requestAnimationFrame(() => {
+            this.toggleActiveHeading();
+            requestAnimationFrame(() => {
+                this.scrollToActiveHeading();
+            });
+        });
+    };
+
+    private fallback = () => {
+        if (!this.sections.length) return;
+
+        for (let i = 0; i < this.sections.length; i++) {
+            const { top: offsetTop, bottom: offsetBottom } = this.sections[i].getBoundingClientRect();
+
+            if (this.isInRange(offsetTop, 0, window.innerHeight) ||
+                this.isInRange(offsetBottom, 0, window.innerHeight) ||
+                (offsetTop < 0 && offsetBottom > window.innerHeight)) {
+                this.markActiveHeading(i);
+            } else if (offsetTop > window.innerHeight) {
+                break;
+            }
+        }
+    };
+
+    private markActiveHeading = (idx: number) => {
+        this.active[idx] = true;
+    };
+
+    private handleAnchorClick = (event: Event) => {
+        const anchor = event
+            .composedPath()
+            .find((element): element is HTMLAnchorElement => element instanceof HTMLAnchorElement);
+
+        if (anchor) {
+            const id = decodeURIComponent(anchor.hash?.substring(1));
+            const idx = this.headingIdxMap.get(id);
+            this.anchorNavTarget = idx !== undefined ? this.headings[idx] : null;
+        }
+    };
+
+    private isInRange(value: number, min: number, max: number): boolean {
+        return min < value && value < max;
+    }
+
+    connectedCallback() {
+        setTimeout(() => {
+            this.init();
+        }, 100);
+    }
+
+    private init() {
+        requestAnimationFrame(() => {
+            this.tocEl = document.getElementById("toc-inner-wrapper");
+            if (!this.tocEl) return;
+
+            this.tocEl.addEventListener("click", this.handleAnchorClick, {
+                capture: true,
+            });
+
+            this.activeIndicator = document.getElementById("active-indicator");
+            this.tocEntries = Array.from(
+                document.querySelectorAll<HTMLAnchorElement>("#toc a[href^='#']")
+            );
+
+            if (this.tocEntries.length === 0) return;
+
+            this.sections = new Array(this.tocEntries.length);
+            this.headings = new Array(this.tocEntries.length);
+            
+            // Initialize headings and sections
+            for (let i = 0; i < this.tocEntries.length; i++) {
+                const id = decodeURIComponent(this.tocEntries[i].hash?.substring(1));
+                const heading = document.getElementById(id);
+                const section = heading?.parentElement;
+                
+                if (heading instanceof HTMLElement && section instanceof HTMLElement) {
+                    this.headings[i] = heading;
+                    this.sections[i] = section;
+                    this.headingIdxMap.set(id, i);
+                }
+            }
+            
+            this.active = new Array(this.tocEntries.length).fill(false);
+
+            // Observe sections
+            this.sections.forEach((section) => this.observer.observe(section));
+
+            // Initial update after DOM is fully rendered
+            setTimeout(() => {
+                this.fallback();
+                this.update();
+            }, 100);
+        });
+    }
+}
+
+customElements.define("table-of-contents", TableOfContents);
+</script>
+
+<style>
+    /* 添加滚动条样式 */
+    .overflow-y-auto {
+        scrollbar-width: thin;
+        scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    }
+
+    .overflow-y-auto::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .overflow-y-auto::-webkit-scrollbar-track {
+        background: var(--scrollbar-track);
+    }
+
+    .overflow-y-auto::-webkit-scrollbar-thumb {
+        background-color: var(--scrollbar-thumb);
+        border-radius: 3px;
+    }
+
+    /* 移动端样式优化 */
+    @media (max-width: 1024px) {
+        #active-indicator {
+            display: none !important;
+        }
+    }
+</style>

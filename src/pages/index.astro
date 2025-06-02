@@ -1,0 +1,63 @@
+---
+import { getEntry } from "astro:content";
+import { render } from "astro:content";
+import MainGridLayout from "../layouts/MainGridLayout.astro";
+import Markdown from "@components/misc/Markdown.astro";
+import I18nKey from "../i18n/i18nKey";
+import { i18n } from "../i18n/translation";
+import Profile from "@components/widget/Profile.astro";
+
+const aboutPost = await getEntry("spec", "about");
+if (!aboutPost) {
+	throw new Error("About page content not found");
+}
+const { Content, headings } = await render(aboutPost);
+---
+
+<MainGridLayout title={i18n(I18nKey.about)} description={i18n(I18nKey.about)} headings={headings}>
+  <div id="toc-anchor">
+    <!-- 移动端显示Profile，桌面端隐藏 -->
+    <div id="about-profile-container" class="block lg:hidden mb-4">
+      <Profile />
+    </div>
+    <div class="flex w-full rounded-[var(--radius-large)] overflow-hidden relative min-h-32">
+        <div class="card-base z-10 px-9 py-6 relative w-full ">
+            <Markdown class="mt-2">
+                <Content />
+            </Markdown>
+        </div>
+    </div>
+  </div>
+</MainGridLayout>
+
+<script>
+  // 确保在客户端导航时保持正确的Profile显示
+  function handleAboutPageProfile() {
+    const profileContainer = document.getElementById('about-profile-container');
+    if (profileContainer) {
+      // 确保在About页面并且在移动端视图才显示
+      if (window.innerWidth < 1024) { // lg断点通常在1024px
+        profileContainer.classList.remove('hidden');
+        profileContainer.classList.add('block');
+      } else {
+        profileContainer.classList.remove('block');
+        profileContainer.classList.add('hidden');
+      }
+    }
+  }
+
+  // 初次加载时检查
+  document.addEventListener('DOMContentLoaded', handleAboutPageProfile);
+  
+  // 监听窗口大小变化
+  window.addEventListener('resize', handleAboutPageProfile);
+  
+  // 监听Swup页面切换
+  if (window.swup) {
+    window.swup.hooks.on('content:replace', handleAboutPageProfile);
+  } else {
+    document.addEventListener('swup:enable', () => {
+      window.swup.hooks.on('content:replace', handleAboutPageProfile);
+    });
+  }
+</script> 

@@ -1,0 +1,415 @@
+---
+import { Icon } from "astro-icon/components";
+import { navBarConfig, siteConfig } from "../config";
+import { LinkPresets } from "../constants/link-presets";
+import { LinkPreset, type NavBarLink } from "../types/config";
+import { url } from "../utils/url-utils";
+import LightDarkSwitch from "./LightDarkSwitch.svelte";
+import Search from "./Search.svelte";
+import DisplaySettings from "./widget/DisplaySettings.svelte";
+import NavMenuPanel from "./widget/NavMenuPanel.astro";
+const className = Astro.props.class;
+
+// 将链接解析为NavBarLink对象
+let links: NavBarLink[] = navBarConfig.links.map(
+	(item: NavBarLink | LinkPreset): NavBarLink => {
+		if (typeof item === "number") {
+			return LinkPresets[item];
+		}
+		return item;
+	},
+);
+
+// 分离内部链接和外部链接
+const internalLinks: NavBarLink[] = links.filter(link => !link.external);
+const externalLinks: NavBarLink[] = links.filter(link => link.external);
+
+// 初始状态下所有外部链接都在导航栏中显示
+const externalLinksInNav = externalLinks;
+const externalLinksInMenu: NavBarLink[] = [];
+---
+<div id="navbar" class="z-50 onload-animation">
+    <div class="absolute h-8 left-0 right-0 -top-8 bg-[var(--card-bg)] transition"></div> <!-- used for onload animation -->
+    <div class:list={[
+        className,
+        "card-base !overflow-visible max-w-[var(--page-width)] h-[4.5rem] !rounded-t-none mx-auto flex items-center px-4"]}>
+        <a href={url('/')} class="btn-plain scale-animation rounded-lg h-[3.25rem] w-auto md:w-[16.5rem] px-5 font-bold active:scale-95 flex-shrink-0">
+            <div class="flex flex-row text-[var(--primary)] items-center text-md">
+                <Icon name="formkit:avatarman" class="text-[1.8rem] mb-1 mr-2" />
+                <span class="whitespace-nowrap">{siteConfig.title}</span>
+            </div>
+        </a>
+        
+        <!-- 导航栏中的链接容器 -->
+        <div id="nav-links-container" class="flex items-center flex-grow min-w-0">
+            <!-- 内部链接 -->
+            <div class="flex items-center flex-shrink-0">
+            {internalLinks.map((l) => {
+                const isHome = l.url === LinkPresets[LinkPreset.Home].url;
+                const isArchive = l.url === LinkPresets[LinkPreset.Archive].url;
+                return <a aria-label={l.name} href={url(l.url)}
+                              class="btn-plain scale-animation rounded-lg h-11 font-bold px-3 md:px-4 active:scale-95"
+                >
+                    <div class="flex items-center whitespace-nowrap">
+                        {isHome && <Icon name="emojione-monotone:books" class="text-[1.75rem]" />}
+                        {isArchive && <Icon name="material-symbols:archive-outline-rounded" class="text-[1.75rem]" />}
+                        <span class="ml-2 hidden sm:inline">{l.name}</span>
+                    </div>
+                </a>;
+            })}
+            </div>
+            
+            <!-- 外部链接容器 -->
+            <div id="external-links-container" class="flex items-center flex-grow min-w-0">
+            {externalLinksInNav.map((l) => {
+                return <a aria-label={l.name} href={l.url} target="_blank"
+                              class="btn-plain scale-animation rounded-lg h-11 font-bold px-3 md:px-4 active:scale-95 external-link"
+                >
+                        <div class="flex items-center whitespace-nowrap">
+                        {l.name}
+                        <Icon name="fa6-solid:arrow-up-right-from-square" class="text-[0.875rem] transition -translate-y-[1px] ml-1 text-black/[0.2] dark:text-white/[0.2]"></Icon>
+                    </div>
+                </a>;
+            })}
+            </div>
+        </div>
+        
+        <div id="function-buttons" class="flex items-center gap-1 md:gap-2 flex-shrink-0">
+            <Search client:only="svelte"></Search>
+            {!siteConfig.themeColor.fixed && (
+                    <button aria-label="Display Settings" class="btn-plain scale-animation rounded-lg h-11 w-11 active:scale-90" id="display-settings-switch">
+                        <Icon name="material-symbols:palette-outline" class="text-[1.25rem]"></Icon>
+                    </button>
+            )}
+            <LightDarkSwitch client:only="svelte"></LightDarkSwitch>
+            
+            <button aria-label="Menu" name="Nav Menu" class="btn-plain scale-animation rounded-lg h-11 w-11 flex items-center justify-center active:scale-90" id="nav-menu-switch">
+                    <Icon name="material-symbols:menu-rounded" class="text-[1.25rem]"></Icon>
+                </button>
+        </div>
+        
+        <NavMenuPanel links={externalLinksInMenu}></NavMenuPanel>
+        <DisplaySettings client:only="svelte"></DisplaySettings>
+    </div>
+</div>
+
+<script>
+function switchTheme() {
+    if (localStorage.theme === 'dark') {
+        document.documentElement.classList.remove('dark');
+        localStorage.theme = 'light';
+    } else {
+        document.documentElement.classList.add('dark');
+        localStorage.theme = 'dark';
+    }
+}
+
+function loadButtonScript() {
+    let switchBtn = document.getElementById("scheme-switch");
+    if (switchBtn) {
+        switchBtn.onclick = function () {
+            switchTheme()
+        };
+    }
+
+    let settingBtn = document.getElementById("display-settings-switch");
+    if (settingBtn) {
+        settingBtn.onclick = function () {
+            let settingPanel = document.getElementById("display-setting");
+            if (settingPanel) {
+                settingPanel.classList.toggle("float-panel-closed");
+            }
+        };
+    }
+
+    let menuBtn = document.getElementById("nav-menu-switch");
+    if (menuBtn) {
+        menuBtn.onclick = function () {
+            let menuPanel = document.getElementById("nav-menu-panel");
+            if (menuPanel) {
+                menuPanel.classList.toggle("float-panel-closed");
+            }
+        };
+    }
+}
+
+loadButtonScript();
+
+// 获取所有外部链接数据
+const externalLinks = Array.from(document.querySelectorAll('.external-link')).map(link => ({
+    name: link.querySelector('.flex.items-center')?.textContent?.trim() || '',
+    url: link.getAttribute('href') || '',
+    external: true
+}));
+
+// 缓存DOM元素
+const navLinksContainer = document.getElementById('nav-links-container');
+const externalLinksContainer = document.getElementById('external-links-container');
+const functionButtons = document.getElementById('function-buttons');
+const navMenuPanel = document.getElementById('nav-menu-panel');
+const menuButton = document.getElementById('nav-menu-switch');
+
+// 创建按钮模板函数
+const createExternalLinkButton = (link) => {
+    const linkElement = document.createElement('a');
+    linkElement.setAttribute('aria-label', link.name);
+    linkElement.setAttribute('href', link.url);
+    linkElement.setAttribute('target', '_blank');
+    linkElement.className = 'btn-plain scale-animation rounded-lg h-11 font-bold px-3 md:px-4 active:scale-95 external-link';
+    linkElement.setAttribute('data-link-id', link.name);
+    
+    linkElement.innerHTML = `
+        <div class="flex items-center whitespace-nowrap">
+            ${link.name}
+            <svg class="text-[0.875rem] transition -translate-y-[1px] ml-1 text-black/[0.2] dark:text-white/[0.2]" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 512 512">
+                <path fill="currentColor" d="M320 0c-17.7 0-32 14.3-32 32s14.3 32 32 32h82.7L201.4 265.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L448 109.3V192c0 17.7 14.3 32 32 32s32-14.3 32-32V32c0-17.7-14.3-32-32-32H320zM80 32C35.8 32 0 67.8 0 112v320c0 44.2 35.8 80 80 80h320c44.2 0 80-35.8 80-80V320c0-17.7-14.3-32-32-32s-32 14.3-32 32v112c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16V112c0-8.8 7.2-16 16-16h112c17.7 0 32-14.3 32-32s-14.3-32-32-32H80z"/>
+            </svg>
+        </div>
+    `;
+    
+    return linkElement;
+};
+
+const createMenuLink = (link) => `
+    <a href="${link.url}" 
+       class="group flex justify-between items-center py-2 pl-3 pr-1 rounded-lg gap-8 hover:bg-[var(--btn-plain-bg-hover)] active:bg-[var(--btn-plain-bg-active)] transition"
+       target="_blank"
+       data-link-id="${link.name}"
+    >
+        <div class="transition text-black/75 dark:text-white/75 font-bold group-hover:text-[var(--primary)] group-active:text-[var(--primary)]">
+            ${link.name}
+        </div>
+        <svg class="transition text-[0.75rem] text-black/25 dark:text-white/25 -translate-x-1" xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" viewBox="0 0 512 512">
+            <path fill="currentColor" d="M320 0c-17.7 0-32 14.3-32 32s14.3 32 32 32h82.7L201.4 265.4c-12.5 12.5-12.5 32.8 0 45.3s32.8 12.5 45.3 0L448 109.3V192c0 17.7 14.3 32 32 32s32-14.3 32-32V32c0-17.7-14.3-32-32-32H320zM80 32C35.8 32 0 67.8 0 112v320c0 44.2 35.8 80 80 80h320c44.2 0 80-35.8 80-80V320c0-17.7-14.3-32-32-32s-32 14.3-32 32v112c0 8.8-7.2 16-16 16H80c-8.8 0-16-7.2-16-16V112c0-8.8 7.2-16 16-16h112c17.7 0 32-14.3 32-32s-14.3-32-32-32H80z"/>
+        </svg>
+    </a>
+`;
+
+if (navLinksContainer && externalLinksContainer && functionButtons && navMenuPanel && menuButton) {
+    // 缓存计算结果
+    let lastVisibleCount = -1;
+    let widthCache = new Map();
+    
+    const calculateLinkWidth = (text) => {
+        if (widthCache.has(text)) {
+            return widthCache.get(text);
+        }
+
+        const tempSpan = document.createElement('span');
+        tempSpan.style.cssText = `
+            visibility: hidden;
+            position: absolute;
+            white-space: nowrap;
+            font: ${getComputedStyle(document.body).font};
+            font-weight: bold;
+        `;
+        tempSpan.textContent = text;
+        document.body.appendChild(tempSpan);
+        const textWidth = tempSpan.offsetWidth;
+        document.body.removeChild(tempSpan);
+        
+        const isMobile = window.innerWidth <= 768;
+        const iconWidth = 16;
+        const padding = isMobile ? 16 : 24;
+        const margin = isMobile ? 4 : 8; // 增加一点间距确保完整显示
+        // 添加一些额外空间确保完整显示
+        const extraSpace = isMobile ? 4 : 8;
+        const totalWidth = textWidth + iconWidth + padding + margin + extraSpace;
+        
+        widthCache.set(text, totalWidth);
+        return totalWidth;
+    };
+
+    const updateLayout = () => {
+        const containerWidth = navLinksContainer.offsetWidth;
+        const internalLinksWidth = navLinksContainer.querySelector('div:first-child')?.offsetWidth || 0;
+        
+        const isMobile = window.innerWidth <= 768;
+        // 设置最小安全边距
+        const safetyMargin = isMobile ? 4 : 8;
+        
+        // 计算实际可用空间
+        const availableWidth = containerWidth - internalLinksWidth - safetyMargin;
+        
+        let visibleCount = 0;
+        let usedWidth = 0;
+        
+        // 计算可以完整显示的链接数量
+        for (const link of externalLinks) {
+            const linkWidth = calculateLinkWidth(link.name);
+            // 确保有足够空间完整显示当前链接
+            if (usedWidth + linkWidth + safetyMargin <= availableWidth) {
+                usedWidth += linkWidth;
+                visibleCount++;
+            } else {
+                break; // 如果空间不够完整显示，直接退出
+            }
+        }
+
+        // 只在显示数量变化时更新DOM
+        if (visibleCount !== lastVisibleCount) {
+            const visibleLinks = externalLinks.slice(0, visibleCount);
+            const menuLinks = externalLinks.slice(visibleCount);
+            
+            // 更新导航栏中的链接
+            externalLinksContainer.innerHTML = '';
+            visibleLinks.forEach(link => {
+                const linkElement = createExternalLinkButton(link);
+                externalLinksContainer.appendChild(linkElement);
+                setTimeout(() => {
+                    linkElement.classList.add('opacity-100');
+                }, 50);
+            });
+            
+            // 更新菜单面板中的链接
+            navMenuPanel.innerHTML = menuLinks.map(createMenuLink).join('');
+            
+            // 更新菜单按钮显示状态
+            const shouldShowMenu = menuLinks.length > 0;
+            menuButton.style.display = shouldShowMenu ? 'flex' : 'none';
+            menuButton.style.opacity = shouldShowMenu ? '1' : '0';
+            
+            if (!shouldShowMenu && !navMenuPanel.classList.contains('float-panel-closed')) {
+                navMenuPanel.classList.add('float-panel-closed');
+            }
+            
+            lastVisibleCount = visibleCount;
+        }
+    };
+
+    // 使用ResizeObserver监听容器大小变化
+    const resizeObserver = new ResizeObserver(() => {
+        requestAnimationFrame(updateLayout);
+    });
+    
+    // 监听导航栏容器和功能按钮容器的大小变化
+    resizeObserver.observe(navLinksContainer);
+    resizeObserver.observe(functionButtons);
+
+    // 监听窗口大小变化，使用防抖
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        widthCache.clear(); // 清除宽度缓存，因为字体大小可能会改变
+        resizeTimeout = setTimeout(() => {
+            requestAnimationFrame(updateLayout);
+        }, 100);
+    });
+
+    // 初始化布局
+    updateLayout();
+}
+</script>
+
+<style>
+    #nav-links-container {
+        flex: 1;
+        min-width: 0;
+        margin: 0 0.25rem;
+        display: flex;
+        justify-content: flex-start;
+        gap: 0.25rem;
+        overflow: hidden;
+    }
+
+    #external-links-container {
+        display: flex;
+        gap: 0.25rem;
+        flex-wrap: nowrap;
+        overflow: hidden;
+        margin-left: 0.25rem;
+        transition: all 0.3s ease-in-out;
+        flex-grow: 1;
+    }
+
+    .external-link {
+        opacity: 0;
+        transform: translateY(10px);
+        transition: all 0.3s ease-in-out;
+        padding: 0 0.5rem;
+    }
+
+    @media (min-width: 769px) {
+        .external-link {
+            padding: 0 0.75rem;
+        }
+    }
+
+    .external-link.opacity-100 {
+        opacity: 1;
+        transform: translateY(0);
+    }
+
+    /* 移动端适配 */
+    @media (max-width: 768px) {
+        #nav-links-container {
+            margin: 0 0.25rem;
+            gap: 0.125rem;
+        }
+
+        #external-links-container {
+            gap: 0.125rem;
+            margin-left: 0.125rem;
+        }
+
+        .external-link {
+            font-size: 0.875rem;
+        }
+    }
+
+    /* 动画优化 */
+    @media (prefers-reduced-motion: reduce) {
+        .external-link,
+        #nav-menu-panel,
+        #external-links-container {
+            transition: none;
+        }
+    }
+
+    /* 菜单面板样式 */
+    #nav-menu-panel {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 0.5rem;
+        min-width: 12rem;
+        max-width: 16rem;
+        background: var(--card-bg);
+        border-radius: 0.75rem;
+        box-shadow: var(--shadow-md);
+        padding: 0.5rem;
+        z-index: 50;
+        transform-origin: top right;
+        transition: all 0.3s ease-in-out;
+    }
+
+    #nav-menu-panel.float-panel-closed {
+        opacity: 0;
+        transform: scale(0.95);
+        pointer-events: none;
+    }
+
+    #nav-menu-panel a {
+        width: 100%;
+        padding: 0.625rem 1rem;
+        border-radius: 0.5rem;
+        transition: all 0.2s ease-in-out;
+    }
+
+    /* 菜单按钮过渡动画 */
+    #nav-menu-switch {
+        transition: opacity 0.3s ease-in-out;
+    }
+</style>
+
+{import.meta.env.PROD && <script is:inline define:vars={{scriptUrl: url('/pagefind/pagefind.js')}}>
+async function loadPagefind() {
+    const pagefind = await import(scriptUrl)
+    await pagefind.options({
+        'excerptLength': 20
+    })
+    pagefind.init()
+    window.pagefind = pagefind
+    pagefind.search('')     // speed up the first search
+}
+loadPagefind()
+</script>}

@@ -1,0 +1,479 @@
+---
+import { Icon } from "astro-icon/components";
+import { siteConfig } from "../../config";
+---
+
+{siteConfig.toc.enable && 
+<button id="toc-button" class="fixed top-[calc(5.5rem+1rem)] right-4 z-[100] w-10 h-10 rounded-full bg-[var(--btn-regular-bg)] 
+    hover:bg-[var(--btn-regular-bg-hover)] active:bg-[var(--btn-regular-bg-active)]
+    flex items-center justify-center text-[var(--btn-content)] shadow-lg transition-all duration-200
+    lg:hidden hidden">
+    <Icon name="material-symbols:menu-book-outline-rounded" class="text-xl transition-transform duration-300"></Icon>
+</button>}
+
+<script>
+    let tocButton: HTMLElement | null = null;
+    let toc: Element | null = null;
+    let isOpen = false;
+    let modal: HTMLElement | null = null;
+    let tocContainer: HTMLElement | null = null;
+    let observer: MutationObserver | null = null;
+    let cachedHeadings: NodeListOf<Element> | null = null;
+    let scrollHandler: (() => void) | null = null;
+
+    function removeAllTocModals() {
+        document.querySelectorAll('#toc-modal').forEach(el => el.remove());
+        document.querySelectorAll('#toc-container').forEach(el => el.remove());
+        isOpen = false;
+    }
+
+    function getAnchorElement() {
+        let anchor = document.getElementById('toc-anchor');
+        if (anchor) return anchor;
+        anchor = document.getElementById('post-container');
+        if (anchor) return anchor;
+        anchor = document.querySelector('.card-base');
+        if (anchor) return anchor;
+        anchor = document.querySelector('main');
+        return anchor;
+    }
+
+    function checkTocContent() {
+        if (!tocButton) return;
+        toc = document.querySelector('#toc');
+        if (!toc) {
+            tocButton.classList.add('hidden');
+            if (isOpen) removeAllTocModals();
+            return;
+        }
+        cachedHeadings = toc.querySelectorAll('a[href^="#"]');
+        updateTocButtonVisibilityOnScroll();
+        if (!cachedHeadings.length && isOpen) removeAllTocModals();
+    }
+
+    function closeToc() {
+        if (!modal || !tocContainer) return;
+        const icon = tocButton?.querySelector('svg');
+        isOpen = false;
+        icon?.classList.remove('rotate-180');
+        tocButton?.classList.remove('bg-[var(--btn-regular-bg-active)]');
+        modal.classList.remove('opacity-100');
+        modal.classList.add('opacity-0');
+        requestAnimationFrame(() => {
+            tocContainer.classList.remove('translate-x-0');
+            tocContainer.classList.add('translate-x-full');
+            setTimeout(() => {
+                modal?.remove();
+                tocContainer?.remove();
+                modal = null;
+                tocContainer = null;
+            }, 200);
+        });
+    }
+
+    function updateTocButtonVisibilityOnScroll() {
+        if (!tocButton) return;
+        const anchor = getAnchorElement();
+        if (!anchor || !cachedHeadings) {
+            tocButton.classList.add('hidden');
+            return;
+        }
+        if (cachedHeadings.length === 0) {
+            tocButton.classList.add('hidden');
+            return;
+        }
+        const rect = anchor.getBoundingClientRect();
+        // 只在正文区域内显示按钮
+        const inView = rect.top < window.innerHeight - 80 && rect.bottom > 80;
+        const isInContentArea = rect.top < 0; // 当内容区域顶部进入视口上方时
+        if (inView && isInContentArea) {
+            tocButton.classList.remove('hidden');
+            // 如果目录未打开，重置图标状态
+            if (!isOpen) {
+                const icon = tocButton.querySelector('svg');
+                icon?.classList.remove('rotate-180');
+            }
+        } else {
+            tocButton.classList.add('hidden');
+            if (isOpen) removeAllTocModals();
+        }
+    }
+
+    function addScrollListener() {
+        removeScrollListener();
+        scrollHandler = updateTocButtonVisibilityOnScroll;
+        window.addEventListener('scroll', scrollHandler);
+    }
+    function removeScrollListener() {
+        if (scrollHandler) {
+            window.removeEventListener('scroll', scrollHandler);
+            scrollHandler = null;
+        }
+    }
+
+    function initTocButton() {
+        if (observer) {
+            observer.disconnect();
+            observer = null;
+        }
+        cachedHeadings = null;
+        tocButton = document.getElementById('toc-button');
+        toc = document.querySelector('#toc');
+        if (tocButton) {
+            checkTocContent();
+            if (toc) {
+                observer = new MutationObserver(() => {
+                    cachedHeadings = null;
+                    checkTocContent();
+                });
+                observer.observe(toc, { childList: true, subtree: true });
+            }
+            tocButton.removeEventListener('click', handleTocClick);
+            tocButton.addEventListener('click', handleTocClick);
+            addScrollListener();
+            updateTocButtonVisibilityOnScroll();
+        }
+    }
+
+    function handleTocClick() {
+        removeAllTocModals();
+        toc = document.querySelector('#toc');
+        const icon = tocButton?.querySelector('svg');
+        const hasValidHeadings = toc && toc.querySelectorAll('a[href^="#"]').length > 0;
+        if (!hasValidHeadings) {
+            isOpen = false;
+            return;
+        }
+        if (isOpen) {
+            closeToc();
+        } else {
+            icon?.classList.add('rotate-180');
+            modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 z-40 lg:hidden opacity-0';
+            modal.id = 'toc-modal';
+            tocContainer = document.createElement('div');
+            tocContainer.className = 'fixed top-[calc(5.5rem+4rem)] right-0 min-w-[12rem] max-w-[16rem] z-50 lg:hidden translate-x-full rounded-xl overflow-hidden bg-white/90 dark:bg-[#1a1a1a]/90 backdrop-blur-sm shadow-lg';
+            tocContainer.id = 'toc-container';
+            const tocContent = toc.cloneNode(true);
+            const tocContentWrapper = document.createElement('div');
+            tocContentWrapper.className = 'toc-content-wrapper hide-scrollbar';
+            tocContentWrapper.style.maxHeight = 'calc(6 * 2rem + 5 * 0.5rem + 2rem)';
+            tocContentWrapper.style.overflowY = 'auto';
+            tocContentWrapper.style.overscrollBehavior = 'contain';
+            tocContentWrapper.appendChild(tocContent);
+            tocContainer.appendChild(tocContentWrapper);
+            document.body.appendChild(modal);
+            document.body.appendChild(tocContainer);
+
+            // 阻止滚动传播
+            tocContentWrapper.addEventListener('wheel', (e) => {
+                const { scrollTop, scrollHeight, clientHeight } = tocContentWrapper;
+                // 当滚动到顶部或底部时阻止继续滚动
+                if (
+                    (scrollTop <= 0 && e.deltaY < 0) || // 到顶部且继续向上滚
+                    (scrollTop + clientHeight >= scrollHeight && e.deltaY > 0) // 到底部且继续向下滚
+                ) {
+                    e.preventDefault();
+                }
+                // 阻止事件冒泡
+                e.stopPropagation();
+                
+                // 滚动时更新高亮指示器位置
+                requestAnimationFrame(() => {
+                    updateActiveHeading(true);
+                });
+            }, { passive: false });
+
+            // 处理触摸滚动
+            let touchStartY = 0;
+            tocContentWrapper.addEventListener('touchstart', (e) => {
+                touchStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            tocContentWrapper.addEventListener('touchmove', (e) => {
+                const touchY = e.touches[0].clientY;
+                const { scrollTop, scrollHeight, clientHeight } = tocContentWrapper;
+                
+                // 检查是否到达边界
+                if (
+                    (scrollTop <= 0 && touchY > touchStartY) || // 到顶部且继续向下拉
+                    (scrollTop + clientHeight >= scrollHeight && touchY < touchStartY) // 到底部且继续向上拉
+                ) {
+                    e.preventDefault();
+                }
+                e.stopPropagation();
+                
+                // 滚动时更新高亮指示器位置
+                requestAnimationFrame(() => {
+                    updateActiveHeading(true);
+                });
+            }, { passive: false });
+
+            requestAnimationFrame(() => {
+                modal.classList.remove('opacity-0');
+                modal.classList.add('opacity-100');
+                tocContainer.classList.remove('translate-x-full');
+                tocContainer.classList.add('translate-x-0');
+            });
+            modal.addEventListener('click', closeToc);
+            isOpen = true;
+
+            // 重新实现移动端目录的高亮功能
+            const mobileToc = tocContainer.querySelector('table-of-contents');
+            if (mobileToc) {
+                const headings = Array.from(document.querySelectorAll('h1[id], h2[id], h3[id], h4[id], h5[id], h6[id]'));
+                const tocLinks = Array.from(mobileToc.querySelectorAll('a[href^="#"]'));
+                
+                // 确保目录项和标题一一对应
+                const headingMap = new Map();
+                headings.forEach((heading, index) => {
+                    const id = heading.getAttribute('id');
+                    if (id) {
+                        headingMap.set(id, index);
+                    }
+                });
+
+                let activeIndicator = document.createElement('div');
+                activeIndicator.className = '-z-10 absolute bg-[var(--toc-btn-hover)] left-0 right-0 rounded-xl transition-all border-2 border-[var(--toc-btn-hover)] border-dashed';
+                activeIndicator.style.display = 'none'; // 默认隐藏
+                // 插入到ul/ol内
+                const tocList = mobileToc.querySelector('ul,ol');
+                if (tocList) {
+                    tocList.appendChild(activeIndicator);
+                } else {
+                    mobileToc.appendChild(activeIndicator); // 兜底
+                }
+
+                function updateActiveHeading(isScrolling = false) {
+                    if (!isOpen) return;
+                    
+                    let activeIndex = -1;
+                    let minDistance = Infinity;
+                    const scrollTop = window.scrollY;
+                    const viewportHeight = window.innerHeight;
+                    const buffer = 50; // 添加缓冲区
+
+                    // 改进的距离计算
+                    headings.forEach((heading, index) => {
+                        const rect = heading.getBoundingClientRect();
+                        const absTop = rect.top + scrollTop;
+                        const distance = Math.abs(absTop - scrollTop);
+                        
+                        // 如果标题在视口内或接近视口顶部
+                        if (rect.top > -buffer && rect.top < viewportHeight) {
+                        if (distance < minDistance) {
+                            minDistance = distance;
+                            activeIndex = index;
+                        }
+                        }
+                    });
+
+                    // 如果没找到在视口内的标题，尝试找最接近的
+                    if (activeIndex === -1) {
+                        headings.forEach((heading, index) => {
+                            const rect = heading.getBoundingClientRect();
+                            const absTop = rect.top + scrollTop;
+                            const distance = Math.abs(absTop - scrollTop);
+                            if (distance < minDistance) {
+                                minDistance = distance;
+                                activeIndex = index;
+                            }
+                        });
+                    }
+
+                    let foundActive = false;
+                    tocLinks.forEach((link) => {
+                        const href = link.getAttribute('href');
+                        if (href) {
+                            const id = href.substring(1);
+                            const headingIndex = headingMap.get(id);
+                            if (headingIndex === activeIndex) {
+                                foundActive = true;
+                                link.classList.add('visible');
+                                const linkRect = link.getBoundingClientRect();
+                                const containerRect = tocContainer.getBoundingClientRect();
+                                const top = linkRect.top - containerRect.top;
+                                const height = linkRect.height;
+                                
+                                // 平滑过渡
+                                requestAnimationFrame(() => {
+                                    // 确保在滚动时能够正确定位
+                                    if (isScrolling) {
+                                        // 重新计算位置以避免滚动时的残留
+                                        const updatedRect = link.getBoundingClientRect();
+                                        const updatedTop = updatedRect.top - containerRect.top;
+                                        activeIndicator.style.top = `${updatedTop}px`;
+                                        activeIndicator.style.height = `${updatedRect.height}px`;
+                                    } else {
+                                        activeIndicator.style.top = `${top}px`;
+                                        activeIndicator.style.height = `${height}px`;
+                                    }
+                                    activeIndicator.style.display = '';
+                                });
+
+                                // 优化滚动到视图逻辑
+                                if (!isScrolling && (linkRect.top < containerRect.top || linkRect.bottom > containerRect.bottom)) {
+                                    link.scrollIntoView({ 
+                                        behavior: 'smooth', 
+                                        block: linkRect.top < containerRect.top ? 'start' : 'end'
+                                    });
+                                }
+                            } else {
+                                link.classList.remove('visible');
+                            }
+                        }
+                    });
+
+                    // 只在真正没有找到时才隐藏
+                    if (!foundActive && activeIndex === -1) {
+                        activeIndicator.style.display = 'none';
+                    }
+                }
+
+                // 添加滚动容器监听以处理目录内部滚动
+                tocContentWrapper.addEventListener('scroll', () => {
+                    requestAnimationFrame(() => {
+                        updateActiveHeading(true);
+                    });
+                }, { passive: true });
+
+                // 优化滚动事件处理
+                let scrollTimeout: number | null = null;
+                const scrollHandler = () => {
+                    if (!isOpen) return;
+                    if (scrollTimeout) {
+                        window.cancelAnimationFrame(scrollTimeout);
+                    }
+                    scrollTimeout = requestAnimationFrame(() => {
+                        updateActiveHeading();
+                        scrollTimeout = null;
+                    });
+                };
+
+                // 使用 passive 选项提高滚动性能
+                window.addEventListener('scroll', scrollHandler, { passive: true });
+                
+                // 初始更新一次
+                requestAnimationFrame(updateActiveHeading);
+
+                // 在关闭目录时清理
+                const originalCloseToc = closeToc;
+                closeToc = () => {
+                    if (scrollTimeout) {
+                        window.cancelAnimationFrame(scrollTimeout);
+                        scrollTimeout = null;
+                    }
+                    window.removeEventListener('scroll', scrollHandler);
+                    originalCloseToc();
+                };
+            }
+        }
+    }
+
+    // 初始化
+    initTocButton();
+
+    // 页面切换时彻底清理
+    if (window.swup) {
+        window.swup.hooks.on('content:replace', () => {
+            removeAllTocModals();
+            removeScrollListener();
+            // 重置图标旋转状态
+            const icon = tocButton?.querySelector('svg');
+            icon?.classList.remove('rotate-180');
+            isOpen = false;
+            setTimeout(initTocButton, 100);
+        });
+    } else {
+        document.addEventListener('swup:enable', () => {
+            window.swup.hooks.on('content:replace', () => {
+                removeAllTocModals();
+                removeScrollListener();
+                // 重置图标旋转状态
+                const icon = tocButton?.querySelector('svg');
+                icon?.classList.remove('rotate-180');
+                isOpen = false;
+                setTimeout(initTocButton, 100);
+            });
+        });
+    }
+</script>
+
+<style>
+    #toc-modal {
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+    #toc-container {
+        transition: transform 0.2s ease-out;
+        transform: translateX(100%);
+    }
+    #toc-container.translate-x-0 {
+        transform: translateX(0);
+    }
+    .toc-content-wrapper {
+        padding: 1rem;
+        margin: 0;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        border-radius: inherit;
+        overscroll-behavior: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+    /* 隐藏滚动条但保持可滚动 */
+    .hide-scrollbar {
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+    }
+    .toc-content-wrapper :global(ul) {
+        @apply space-y-2;
+    }
+    .toc-content-wrapper :global(a) {
+        @apply block py-2 px-3 rounded-lg transition-colors duration-200 break-words whitespace-normal text-sm leading-tight;
+        height: 2rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 1;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+    .toc-content-wrapper :global(a:hover) {
+        @apply bg-black/5 dark:bg-white/5;
+    }
+    /* 按钮点击波纹效果 */
+    #toc-button::after {
+        content: '';
+        position: absolute;
+        width: 100%;
+        height: 100%;
+        border-radius: 50%;
+        background: currentColor;
+        opacity: 0;
+        transform: scale(0);
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+    #toc-button:active::after {
+        transform: scale(1.5);
+        opacity: 0.1;
+    }
+    /* 移动端目录项样式 */
+    #toc-container a {
+        transition: all 0.2s ease;
+    }
+    #toc-container a.visible {
+        color: var(--toc-item-active) !important;
+        background: var(--toc-btn-hover);
+    }
+    #toc-container .active-indicator {
+        transition: all 0.2s ease;
+    }
+    /* 按钮图标旋转动画 */
+    #toc-button svg {
+        transition: transform 0.3s ease;
+    }
+    #toc-button svg.rotate-180 {
+        transform: rotate(180deg);
+    }
+</style>
