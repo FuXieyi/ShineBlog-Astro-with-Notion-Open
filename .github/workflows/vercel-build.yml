@@ -1,15 +1,12 @@
 name: Auto Sync Notion and Deploy
 on:
-  # 默认禁用自动触发，模板用户可通过取消下面的注释来启用自动同步
+  # 默认禁用自动触发，可通过取消注释启用自动同步
   # schedule:
   #   - cron: '0 2 * * *' # 每天凌晨2点（UTC）自动触发
   workflow_dispatch: # 允许手动触发
 jobs:
   sync-and-deploy:
     runs-on: ubuntu-latest
-    # 添加权限配置
-    permissions:
-      contents: write # 需要写入权限才能push
     env:
       VERCEL_DEPLOY_HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK }}
       NOTION_API_KEY: ${{ secrets.NOTION_API_KEY }}
@@ -17,11 +14,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0 # 获取完整历史以便正确处理提交
-      
-      - name: Pull latest changes
-        run: git pull
         
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -40,70 +32,6 @@ jobs:
       - name: Sync content from Notion
         run: node scripts/fetch-notion.js
         
-      - name: Check for meaningful changes
-        id: check_changes
-        run: |
-          # 快速检查是否有任何文件变化
-          if [ -z "$(git diff --name-only)" ]; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-            echo "没有文件变化"
-            exit 0
-          fi
-          
-          # 一次性提取所有实质性内容变化，减少进程创建
-          # 使用sed先过滤掉明显的S3 URL行，再用awk处理剩余内容
-          REAL_CHANGES=$(git diff | 
-            sed -e '/X-Amz-\|amazonaws\.com/d' | 
-            awk '
-              # 只保留行增删标记行
-              /^[+-][^+-]/ {
-                # 跳过元数据字段
-                if ($0 ~ /^[+-][[:space:]]*(date|updated|publishDate|lastmod|modDate|created|timestamp|pubDate):/) 
-                  next
-                # 跳过空行
-                if ($0 ~ /^[+-][[:space:]]*$/) 
-                  next
-                # 跳过只有标点符号的行
-                if ($0 ~ /^[+-][[:space:]]*["'\'',.;:][[:space:]]*$/) 
-                  next
-                # 输出实质性变化行
-                print
-              }
-            '
-          )
-          
-          # 输出变化统计以便调试
-          CHANGED_FILES_COUNT=$(git diff --name-only | wc -l)
-          REAL_CHANGES_COUNT=$(echo "$REAL_CHANGES" | wc -l)
-          echo "==== 变化统计 ===="
-          echo "总文件变化数: $CHANGED_FILES_COUNT"
-          echo "实质性内容变化行数: $REAL_CHANGES_COUNT"
-          
-          # 根据实际内容变化决定是否提交
-          if [ -n "$REAL_CHANGES" ]; then
-            echo "==== 检测到的实质性变化示例 ===="
-            echo "$REAL_CHANGES" | head -n 10
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "仅有S3 URL或元数据变化，无实质内容变化"
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-        
-      - name: Commit changes if meaningful changes detected
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add -A
-          git commit -m "Auto-sync from Notion: $(date +%Y-%m-%d)"
-          git push
-          echo "已提交实质性内容变更"
-        
-      - name: Skip commit when no meaningful changes
-        if: steps.check_changes.outputs.has_changes != 'true'
-        run: |
-          echo "仅有元数据、格式或S3 URL变化，跳过提交"
-        
       - name: Trigger Vercel Deploy
         run: |
-          curl -X POST "$VERCEL_DEPLOY_HOOK" # 使用 env 变量
+          curl -X POST "$VERCEL_DEPLOY_HOOK"
